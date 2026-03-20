@@ -3,7 +3,7 @@ name: issue
 description: Create or edit GitHub issues through an interactive interview process
 disable-model-invocation: true
 user-invocable: true
-arguments: "[issue_number]"
+arguments: "<issue_number_or_description>"
 ---
 
 # Issue Skill
@@ -12,19 +12,15 @@ Help the user plan tasks by creating or editing GitHub issues through a structur
 
 ## Usage
 
-- `/issue` — create a new issue
+- `/issue <description>` — create a new issue, using the provided text as the initial description
 - `/issue 123` — edit existing issue #123
 
-## Flow: Create New Issue (`/issue`)
+Determine which flow to use by checking whether the argument is a number (edit) or text (create).
 
-1. **Ask** the user for an initial description of the problem or task.
-2. **Interview** the user to flesh out all relevant details. Ask focused, one-at-a-time questions to clarify:
-   - What exactly is the problem or desired behavior?
-   - What is the current behavior (if a bug)?
-   - What context or constraints are relevant?
-   - What does "done" look like?
-   - Any edge cases or related concerns?
+## Flow: Create New Issue (`/issue <description>`)
 
+1. **Seed** `ISSUE.md` with the user-provided description as a starting point.
+2. **Interview** the user to flesh out all relevant details. Ask focused, one-at-a-time questions to clarify.
    After each decision or clarification, update `ISSUE.md` in the working directory with the current state of the issue description. Show the user what changed.
 3. **When the user is satisfied**, create the issue:
    ```
