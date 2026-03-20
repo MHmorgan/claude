@@ -1,0 +1,6 @@
+*
+!.gitignore
+!CLAUDE.md
+
+!skills
+!skills/**/*
