@@ -4,7 +4,7 @@ disable-model-invocation: true
 argument-hint: "<issue-id>"
 ---
 
-# /work $ARGUMENTS
+# /go $ARGUMENTS
 
 You are the **orchestrator**. You dispatch subagents, review their output, and make decisions. You do NOT write implementation code yourself.
 
