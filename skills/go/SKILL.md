@@ -7,7 +7,11 @@ argument-hint: "<issue-id>"
 # /go $ARGUMENTS
  
 You are the **orchestrator**. You dispatch subagents, review their output, and make decisions. You do NOT write implementation code yourself.
- 
+
+Use `.agent/work/<issue>/` as the folder for your working files.
+DO NOT REMOVE THIS - it is used for traceability and inspection of the work.
+
+
 ---
  
 ## Step 0: Load Issue
@@ -33,7 +37,7 @@ gh issue view <issue-id> --json number,title,body,labels,state
 bd show <issue-id> --json
 ```
  
-Write the issue body to `ISSUE.md` in the working directory if it doesn't already exist. This is the source of truth for the task — all downstream agents reference it.
+Write the issue body to `.agent/work/<issue>/ISSUE.md` in the working directory if it doesn't already exist. This is the source of truth for the task — all downstream agents reference it.
  
 ### Mark as In Progress
  
@@ -50,20 +54,19 @@ Write the issue body to `ISSUE.md` in the working directory if it doesn't alread
 Use the Agent tool with `subagent_type="general-purpose"` to create a plan.
 
 Provide the subagent with:
-- The contents of `ISSUE.md`
+- The contents of `.agent/work/<issue>/ISSUE.md`
 - Instruction to explore the codebase and understand existing patterns
 
 The plan agent must:
 - Break work into small, independent tasks (one logical unit each)
 - For EACH task, specify:
-  - **Goal**: what this task accomplishes (tied to specific acceptance criteria from `ISSUE.md`)
+  - **Goal**: what this task accomplishes (tied to specific acceptance criteria from `.agent/work/<issue>/ISSUE.md`)
   - **Files to modify/create**: exact paths
   - **Test files**: exact paths
   - **Interface contracts**: any types, function signatures, or APIs this task produces that other tasks depend on
   - **Dependencies**: which other tasks must complete first (by task ID)
 - Group tasks by file overlap — tasks touching the same files must be sequential
-- Write plan to `.agent/plans/<feature>.md` (do not commit this)
-- Commit the plan
+- Write plan to `.agent/work/<issue>/plans/<feature>.md` (do not commit this)
 
 ### 1b. Review the Plan
 
@@ -71,19 +74,19 @@ Launch TWO review agents in parallel:
 
 1. **Architecture review** (Agent subagent_type="general-purpose"):
 
-   Provide: `ISSUE.md` + `.agent/plans/<feature>.md`
+   Provide: `.agent/work/<issue>/ISSUE.md` + `.agent/work/<issue>/plans/<feature>.md`
 
    Check:
    - Tasks are atomic (2-5 min each)
    - File paths are exact and realistic
    - TDD steps explicit
    - No unnecessary complexity (YAGNI)
-   - Every acceptance criterion from `ISSUE.md` is covered by at least one task
+   - Every acceptance criterion from `.agent/work/<issue>/ISSUE.md` is covered by at least one task
    - Interface contracts between tasks are consistent
 
 2. **Security review** (Agent subagent_type="general-purpose"):
 
-   Provide: `ISSUE.md` + `.agent/plans/<feature>.md`
+   Provide: `.agent/work/<issue>/ISSUE.md` + `.agent/work/<issue>/plans/<feature>.md`
 
    Check:
    - No hardcoded secrets planned
@@ -110,7 +113,7 @@ For each batch of independent tasks, dispatch ALL implementers in parallel using
 
 **Each implementer receives a scoped context — NOT the full plan.** Construct the prompt for each implementer with exactly:
 
-1. **Overall goal** (one paragraph summary from `ISSUE.md` — the Problem and Desired behavior sections only)
+1. **Overall goal** (one paragraph summary from `.agent/work/<issue>/ISSUE.md` — the Problem and Desired behavior sections only)
 2. **This task's specification** (copied from the plan: goal, files, test files)
 3. **Interface contracts this task must respect** (types, signatures, APIs produced by already-completed tasks that this task depends on)
 4. **Relevant code from already-completed tasks** (only if this task has dependencies — provide the specific files/diffs, not the full history)
@@ -158,15 +161,15 @@ Launch TWO review agents in parallel:
 
 1. **Issue Compliance Agent** (Agent subagent_type="general-purpose"):
 
-   Provide: `ISSUE.md` + `git diff main...HEAD`
+   Provide: `.agent/work/<issue>/ISSUE.md` + `git diff main...HEAD`
 
    Report:
-   - **Delivered** — acceptance criteria fully met (reference specific criteria from `ISSUE.md`)
+   - **Delivered** — acceptance criteria fully met (reference specific criteria from `.agent/work/<issue>/ISSUE.md`)
    - **Partially delivered** — criteria met with caveats
    - **Skipped** — criteria not addressed (with reason)
    - **Added beyond scope** — work done that wasn't in the original issue
    - **Decisions & trade-offs** — any non-obvious choices made during implementation
-   - **Deviations from plan** — where implementation diverged from `.agent/plans/` and why
+   - **Deviations from plan** — where implementation diverged from `.agent/work/<issue>/plans/` and why
 
 2. **Architecture Analysis Agent** (Agent subagent_type="general-purpose"):
 

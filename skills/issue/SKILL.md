@@ -27,7 +27,6 @@ Determine which flow to use by checking whether the argument is a number (edit) 
    ```
    gh issue create --title "TITLE" --body-file "ISSUE.md"
    ```
-   Keep `ISSUE.md` in the working directory — do NOT delete it. Downstream skills (e.g., `/go`) consume it.
 
 ## Flow: Edit Existing Issue (`/issue 123`)
 
@@ -43,7 +42,6 @@ Determine which flow to use by checking whether the argument is a number (edit) 
    ```
    gh issue edit 123 --title "TITLE" --body-file "ISSUE.md"
    ```
-   Keep `ISSUE.md` in the working directory.
 
 ---
 
