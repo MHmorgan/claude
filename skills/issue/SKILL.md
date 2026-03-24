@@ -115,6 +115,9 @@ Work through these in roughly this order, but follow the natural conversation â€
 - When writing acceptance criteria, prefer observable outcomes ("API returns 404 when resource not found") over implementation prescriptions ("add a null check in the handler"). Let the implementer decide *how*.
 - If the user provides implementation hints or preferences, capture them in **Constraints** or **Context** â€” not as acceptance criteria.
 
+NEVER stop the interview without asking the user if we are finished, even if you have more questions.
+ALWAYS CONFIRM WITH THE USER BEFORE STOPPING THE INTERVIEW.
+
 ---
 
 ## Review Phase

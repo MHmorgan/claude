@@ -4,12 +4,41 @@ disable-model-invocation: true
 argument-hint: "<issue-id>"
 ---
 
-# /go
-
+# /go $ARGUMENTS
+ 
 You are the **orchestrator**. You dispatch subagents, review their output, and make decisions. You do NOT write implementation code yourself.
-
-Ensure `ISSUE.md` exists in the working directory.
-This is the source of truth for the task — all downstream agents reference it.
+ 
+---
+ 
+## Step 0: Load Issue
+ 
+If `$ARGUMENTS` is provided it can be a **GitHub issue number/URL** or a **beads ID** (if beads is installed).
+ 
+### Detect Issue Source by Format
+ 
+| Input format | Source | Example |
+|--------------|--------|---------|
+| Pure integer | GitHub | `123`, `7316` |
+| GitHub URL | GitHub | `https://github.com/owner/repo/issues/123` |
+| GitHub shorthand | GitHub | `owner/repo#123` |
+| Alphanumeric with letters | beads | `PROJ-123`, `abc-def` |
+ 
+**For GitHub issues:**
+```bash
+gh issue view <issue-id> --json number,title,body,labels,state
+```
+ 
+**For beads issues:**
+```bash
+bd show <issue-id> --json
+```
+ 
+Write the issue body to `ISSUE.md` in the working directory if it doesn't already exist. This is the source of truth for the task — all downstream agents reference it.
+ 
+### Mark as In Progress
+ 
+**GitHub:** `gh issue edit <issue-id> --add-label "in-progress"`
+**Beads:** `bd update <issue-id> --status=in_progress`
 
 
 ---
@@ -33,7 +62,7 @@ The plan agent must:
   - **Interface contracts**: any types, function signatures, or APIs this task produces that other tasks depend on
   - **Dependencies**: which other tasks must complete first (by task ID)
 - Group tasks by file overlap — tasks touching the same files must be sequential
-- Write plan to `.agent-plans/<feature>.md`
+- Write plan to `.agent/plans/<feature>.md` (do not commit this)
 - Commit the plan
 
 ### 1b. Review the Plan
@@ -42,7 +71,7 @@ Launch TWO review agents in parallel:
 
 1. **Architecture review** (Agent subagent_type="general-purpose"):
 
-   Provide: `ISSUE.md` + `.agent-plans/<feature>.md`
+   Provide: `ISSUE.md` + `.agent/plans/<feature>.md`
 
    Check:
    - Tasks are atomic (2-5 min each)
@@ -54,7 +83,7 @@ Launch TWO review agents in parallel:
 
 2. **Security review** (Agent subagent_type="general-purpose"):
 
-   Provide: `ISSUE.md` + `.agent-plans/<feature>.md`
+   Provide: `ISSUE.md` + `.agent/plans/<feature>.md`
 
    Check:
    - No hardcoded secrets planned
@@ -137,7 +166,7 @@ Launch TWO review agents in parallel:
    - **Skipped** — criteria not addressed (with reason)
    - **Added beyond scope** — work done that wasn't in the original issue
    - **Decisions & trade-offs** — any non-obvious choices made during implementation
-   - **Deviations from plan** — where implementation diverged from `.agent-plans/` and why
+   - **Deviations from plan** — where implementation diverged from `.agent/plans/` and why
 
 2. **Architecture Analysis Agent** (Agent subagent_type="general-purpose"):
 
@@ -175,11 +204,10 @@ Dispatch a **Summary Writer Agent** (Agent subagent_type="general-purpose") with
 
 ## Suggested follow-ups
 <Refactoring, structural improvements, or future work worth considering>
-
-Closes #<issue-number>
 ```
 
-Commit `SUMMARY.md` to the branch.
+Do not commit `SUMMARY.md` to the branch.
+
 
 ---
 
@@ -194,13 +222,17 @@ git push
 
 ### Create a Draft PR
 
-Use the content of `SUMMARY.md` as the PR body:
-
 ```bash
-gh pr create --draft --title "<type>(<scope>): <description>" --body "$(cat SUMMARY.md)"
+gh pr create --draft --title "<type>(<scope>): <description>" --body "## Summary
+
+<brief description of changes>
+
+Closes #<issue-number>
+"
 ```
 
-The `Closes #<issue-number>` line in `SUMMARY.md` automatically closes the issue when the PR is merged.
+The `Closes #<issue-number>` syntax automatically closes the issue when the PR is merged.
+
 
 ---
 

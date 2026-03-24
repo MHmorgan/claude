@@ -17,10 +17,10 @@ You are the **orchestrator**. You create a research plan, coordinate an Agent Te
 Create a directory for this research session:
 
 ```bash
-mkdir -p .research/<slugified-topic>
+mkdir -p .agent/research/<slugified-topic>
 ```
 
-Use a short, descriptive slug derived from the research question (e.g., `.research/event-sourcing-kotlin`, `.research/postgres-vs-cockroachdb`).
+Use a short, descriptive slug derived from the research question (e.g., `.agent/research/event-sourcing-kotlin`, `.agent/research/postgres-vs-cockroachdb`).
 
 All research artifacts live here. This directory serves two purposes:
 1. **Working memory for the team** — teammates write findings here to manage context across long sessions
@@ -55,7 +55,7 @@ The subagent should:
 - Search the web for key concepts, major perspectives, and the structure of the topic
 - If codebase-relevant: do a quick scan of relevant code areas to understand current state
 - Identify the main sub-topics, open debates, and key dimensions of the question
-- Write a brief (1-2 page) overview to `.research/<topic>/00-reconnaissance.md`
+- Write a brief (1-2 page) overview to `.agent/research/<topic>/00-reconnaissance.md`
 - Return a summary to the orchestrator
 
 This gives you the map you need to create a good plan. Without it, you're planning blind.
@@ -66,7 +66,7 @@ This gives you the map you need to create a good plan. Without it, you're planni
 
 ### Create a Research Plan
 
-Based on the reconnaissance, create a research plan and write it to `.research/<topic>/PLAN.md`.
+Based on the reconnaissance, create a research plan and write it to `.agent/research/<topic>/PLAN.md`.
 
 The plan must include:
 
@@ -138,7 +138,7 @@ Your mandate:
 
 Your constraints:
 - Follow the approved plan's scope. Do not expand beyond it without reason.
-- All findings go to `.research/<topic>/` — this is the shared knowledge base
+- All findings go to `.agent/research/<topic>/` — this is the shared knowledge base
 - You drive refinement iterations. If a research area is thin, direct the teammate to go deeper. If a new angle emerges, assign follow-up.
 
 **Teammate instructions (per teammate):**
@@ -146,7 +146,7 @@ Your constraints:
 You are a research teammate. You investigate your assigned research areas and write detailed findings.
 
 Working practices:
-- Write findings to `.research/<topic>/<area-slug>.md` as you go — do NOT wait until you're "done"
+- Write findings to `.agent/research/<topic>/<area-slug>.md` as you go — do NOT wait until you're "done"
 - Structure findings with clear sections: key facts, sources, analysis, open questions
 - If you discover something relevant to another teammate's area, message them directly
 - If you hit a dead end or discover the question needs reframing, message the team lead
@@ -155,7 +155,7 @@ Working practices:
 - Prefer primary sources (official docs, papers, original announcements) over secondary summaries
 - When sources disagree, note the disagreement and the evidence for each position
 
-Writing to `.research/<topic>/`:
+Writing to `.agent/research/<topic>/`:
 - Use descriptive filenames: `event-sourcing-patterns.md`, `kafka-exactly-once.md`, `our-current-architecture.md`
 - Write for a knowledgeable reader — your audience is a senior engineer, not a beginner
 - Include source URLs inline so the synthesis can cite them
@@ -165,7 +165,7 @@ Writing to `.research/<topic>/`:
 
 The team lead drives refinement. After the initial research pass:
 
-1. **Gap analysis**: The team lead reads all findings in `.research/<topic>/` and identifies:
+1. **Gap analysis**: The team lead reads all findings in `.agent/research/<topic>/` and identifies:
    - Sub-questions that weren't adequately answered
    - Areas where sources conflict and more evidence is needed
    - Angles that emerged during research that the original plan didn't cover (within scope)
@@ -181,7 +181,7 @@ There is no fixed iteration limit. The plan's scope is the natural governor. Whe
 
 When the team lead judges the research is complete:
 
-1. **The team lead produces a synthesis** by reading all findings in `.research/<topic>/` and writing a structured draft to `.research/<topic>/DRAFT.md`.
+1. **The team lead produces a synthesis** by reading all findings in `.agent/research/<topic>/` and writing a structured draft to `.agent/research/<topic>/DRAFT.md`.
 
    The draft should:
    - Answer the original research question directly
@@ -196,9 +196,9 @@ When the team lead judges the research is complete:
    - Is anything important missing or mischaracterized?
    - Are there nuances that got lost in synthesis?
 
-   Teammates write review comments to `.research/<topic>/REVIEW.md`.
+   Teammates write review comments to `.agent/research/<topic>/REVIEW.md`.
 
-3. **Final draft**: The team lead incorporates review feedback and writes the final version to `.research/<topic>/FINAL.md`.
+3. **Final draft**: The team lead incorporates review feedback and writes the final version to `.agent/research/<topic>/FINAL.md`.
 
 4. **The team lead signals completion** and the orchestrator (you) regains control.
 
@@ -208,7 +208,7 @@ When the team lead judges the research is complete:
 
 ### Review the Output
 
-Read `.research/<topic>/FINAL.md`. This is the team's synthesized answer.
+Read `.agent/research/<topic>/FINAL.md`. This is the team's synthesized answer.
 
 You (the orchestrator) are the last quality gate. Check:
 - Does it actually answer the original research question?
@@ -219,17 +219,17 @@ If the output has significant issues, you can send feedback to the team lead and
 
 ### Write the Final Output
 
-Copy `.research/<topic>/FINAL.md` to the user-facing output location. The default is a Markdown file in the working directory, named descriptively (e.g., `event-sourcing-research.md`).
+Copy `.agent/research/<topic>/FINAL.md` to the user-facing output location. The default is a Markdown file in the working directory, named descriptively (e.g., `event-sourcing-research.md`).
 
 Present the output to the user with a brief summary of:
 - What was researched (scope)
 - How deep the team went (number of sources, research areas covered)
-- Where the raw findings live (`.research/<topic>/`) for deeper review
+- Where the raw findings live (`.agent/research/<topic>/`) for deeper review
 - Any caveats or areas of uncertainty
 
 ### Preserve the Research Directory
 
-Do NOT clean up `.research/<topic>/`. It contains:
+Do NOT clean up `.agent/research/<topic>/`. It contains:
 - `00-reconnaissance.md` — initial survey
 - `PLAN.md` — the approved research plan
 - Individual finding files from each teammate
@@ -246,7 +246,7 @@ This is the audit trail. The user can review any layer of depth — from the pol
 1. **Orchestrator doesn't research** — you plan, dispatch the team, and review the output
 2. **Plan approval is mandatory** — never start the team without user approval of the plan
 3. **Agent Teams, not subagents** — research benefits from cross-pollination between teammates
-4. **Everything goes to `.research/`** — findings, drafts, reviews. This is both working memory and audit trail
+4. **Everything goes to `.agent/research/`** — findings, drafts, reviews. This is both working memory and audit trail
 5. **Scope governs depth** — no arbitrary limits. The approved plan defines what's in scope; the team researches until that scope is covered
 6. **The team lead drives refinement** — gap analysis and follow-up happen within the team, not by the orchestrator micro-managing
 7. **Synthesis is a team effort** — the lead drafts, teammates review against their own findings, lead incorporates feedback
