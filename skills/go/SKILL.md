@@ -183,7 +183,7 @@ Launch TWO review agents in parallel:
 
 ### 4b. Synthesize into SUMMARY.md
 
-Dispatch a **Summary Writer Agent** (Agent subagent_type="general-purpose") with the output from both review agents. It must produce `SUMMARY.md` in the repo root:
+Dispatch a **Summary Writer Agent** (Agent subagent_type="general-purpose") with the output from both review agents. It must produce `.agent/work/<issue>/SUMMARY.md` in the repo root:
 
 ```markdown
 # Summary
