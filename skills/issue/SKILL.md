@@ -27,6 +27,7 @@ Determine which flow to use by checking whether the argument is a number (edit) 
    ```
    gh issue create --title "TITLE" --body-file "ISSUE.md"
    ```
+   Ensure the title is short (2-4 words).
    Remove `ISSUE.md` after the issue has been created.
 
 ## Flow: Edit Existing Issue (`/issue 123`)
@@ -43,6 +44,7 @@ Determine which flow to use by checking whether the argument is a number (edit) 
    ```
    gh issue edit 123 --title "TITLE" --body-file "ISSUE.md"
    ```
+   Ensure the title is short (2-4 words).
    Remove `ISSUE.md` after the issue has been created.
 
 ---
