@@ -1,0 +1,38 @@
+{
+  "model": "opus[1m]",
+  "effortLevel": "high",
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(env *)",
+      "Bash(env)",
+      "Bash(export -p)",
+      "Bash(export)",
+      "Bash(history *)",
+      "Bash(history)",
+      "Bash(printenv *)",
+      "Bash(printenv)",
+      "Bash(rm -fr /)",
+      "Bash(rm -fr /*)",
+      "Bash(rm -rf $HOME)",
+      "Bash(rm -rf $HOME/*)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/*)",
+      "Bash(set *)",
+      "Bash(set)",
+      "Bash(su *)",
+      "Bash(sudo *)"
+    ]
+  }
+}
