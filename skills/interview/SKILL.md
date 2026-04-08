@@ -15,7 +15,8 @@ Help the user plan tasks through a structured interview process.
 1. **Seed** the plan with the user-provided description and any existing plan as a starting point, using the target structure below as a skeleton.
 2. **Interview** the user to flesh out all relevant details (see Interview Phase below).
 3. **Review** the completed issue with three parallel agents (see Review Phase below).
-4. **Triage** review findings (see Triage & Resolution below). If there are open decisions or ambiguities, return to an interview focused on resolving them, then update `ISSUE.md`.
+4. **Triage** review findings (see Triage & Resolution below). If there are open decisions or ambiguities, return to an interview focused on resolving them, then update the plan.
+5. **Save** the plan lastly, and wait for further instructions. Do not implement it.
 
 ---
 
