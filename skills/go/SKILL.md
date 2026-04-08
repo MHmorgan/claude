@@ -16,15 +16,16 @@ DO NOT REMOVE THIS - it is used for traceability and inspection of the work.
  
 ## Step 0: Load Issue
  
-If `$ARGUMENTS` is provided it can be a **GitHub issue number/URL** or a **beads ID** (if beads is installed).
- 
+If `$ARGUMENTS` is provided it can be a **GitHub issue number/URL**, a **spec/plan file** in `~/.claude/plans/`, or a **beads ID** (if beads is installed).
+
 ### Detect Issue Source by Format
- 
+
 | Input format | Source | Example |
 |--------------|--------|---------|
 | Pure integer | GitHub | `123`, `7316` |
 | GitHub URL | GitHub | `https://github.com/owner/repo/issues/123` |
 | GitHub shorthand | GitHub | `owner/repo#123` |
+| Matches file in `~/.claude/plans/` | spec | `api-rate-limiting`, `api-rate-limiting.md` |
 | Alphanumeric with letters | beads | `PROJ-123`, `abc-def` |
  
 **For GitHub issues:**
@@ -36,13 +37,17 @@ gh issue view <issue-id> --json number,title,body,labels,state
 ```bash
 bd show <issue-id> --json
 ```
- 
+
+**For spec files:**
+Read the plan file from `~/.claude/plans/<filename>` (append `.md` if not already present).
+
 Write the issue body to `.agent/work/<issue>/ISSUE.md` in the working directory if it doesn't already exist. This is the source of truth for the task — all downstream agents reference it.
  
 ### Mark as In Progress
  
 **GitHub:** `gh issue edit <issue-id> --add-label "in-progress"`
 **Beads:** `bd update <issue-id> --status=in_progress`
+**Spec:** No action needed (no external system to update).
 
 
 ---
