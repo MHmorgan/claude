@@ -1,6 +1,4 @@
 {
-  "model": "opus[1m]",
-  "effortLevel": "high",
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -13,6 +11,20 @@
       "WebSearch"
     ],
     "deny": [
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git stash *)",
+      "Bash(git switch *)",
+      "Bash(jj commit *)",
+      "Bash(jj commit)",
+      "Bash(jj new *)",
+      "Bash(jj new)",
+      "Bash(jj squash *)",
+      "Bash(jj squash)",
+      "Bash(jj split *)",
+      "Bash(jj split)",
       "Bash(env *)",
       "Bash(env)",
       "Bash(export -p)",
@@ -34,5 +46,8 @@
       "Bash(su *)",
       "Bash(sudo *)"
     ]
-  }
+  },
+  "model": "opus[1m]",
+  "effortLevel": "high",
+  "skipAutoPermissionPrompt": true
 }
