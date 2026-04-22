@@ -49,5 +49,8 @@
   },
   "model": "opus[1m]",
   "effortLevel": "high",
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "enabledPlugins": {
+    "code-review@claude-plugins-official": true
+  }
 }
