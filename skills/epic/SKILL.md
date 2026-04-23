@@ -301,8 +301,10 @@ ae task:add-child <parent>               # add a child to a branch
 ae task:after <id> <pred>                # sibling dependency edge
 ae task:unafter <id> <pred>              # remove dependency edge
 ae task:record <id> <text>               # append an agent note
+ae help                                  # tool help - NEVER RUN THIS
 ```
 
 Write commands (`task:*`) return a JSON envelope `{"ok": bool, "data": ..., "error": ...}`.
 Check `ok` before continuing; surface errors to the user.
 `ae show` and `ae context` return plain text directly.
+
