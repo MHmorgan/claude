@@ -1,5 +1,5 @@
 ---
-name: epic-plan
+name: epic
 description: Plan an epic through structured interviews, recursively splitting into tasks using the `ae` CLI
 disable-model-invocation: true
 user-invocable: true
@@ -21,7 +21,7 @@ body and a handoff context.
 
 ---
 
-## Flow: `/epic-plan <description>`
+## Flow: `/epic <description>`
 
 1. **Resolve the epic** — `ae epics` first. If the description matches an
    existing in-progress epic, offer to resume it. Otherwise propose a slug
