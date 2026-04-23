@@ -24,8 +24,8 @@ body and a handoff context.
 ## Flow: `/epic <description>`
 
 1. **Resolve the epic** — `ae epics` first. If the description matches an
-   existing in-progress epic, offer to resume it. Otherwise propose a slug
-   (lowercase, `[a-z][a-z0-9-]*`), confirm, then `ae task:new-epic <slug>`.
+   existing in-progress epic, offer to resume it. Otherwise create a slug
+   (lowercase, `[a-z][a-z0-9-]*`), then `ae task:new-epic <slug>`.
 2. **Plan the root task** via the per-task loop below.
 3. **Recurse depth-first** into any children created by splits — finish
    child `:1` and its entire subtree before starting `:2`.
@@ -301,7 +301,7 @@ ae task:add-child <parent>               # add a child to a branch
 ae task:after <id> <pred>                # sibling dependency edge
 ae task:unafter <id> <pred>              # remove dependency edge
 ae task:record <id> <text>               # append an agent note
-ae help                                  # tool help - NEVER RUN THIS
+ae help                                  # tool help
 ```
 
 Write commands (`task:*`) return a JSON envelope `{"ok": bool, "data": ..., "error": ...}`.

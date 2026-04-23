@@ -8,7 +8,7 @@ argument-hint: "<issue-id-or-description>"
 
 # /opus $ARGUMENTS
 
-End-to-end flow: interview the user to produce a spec, review it, let the user resolve any open decisions, then hand off to autonomous implementation — plan, build, verify, and review. The skill stops at the review summary; **version control is entirely the user's responsibility.**
+End-to-end flow: explore the codebase, interview the user to produce a spec, review it, let the user pick an architecture, then hand off to autonomous implementation — plan, build, verify, and review. The skill stops at the review summary; **version control is entirely the user's responsibility.**
 
 You are the **orchestrator** throughout. You dispatch subagents, read their output, and make decisions. You do not write implementation code yourself after the spec is finalized, and you do not perform any version-control operations (see Key Rules).
 
@@ -18,7 +18,7 @@ Use `.agent/work/<issue>/` as the folder for all working files. Do not remove it
 
 ## Step 0: Resolve Input
 
-`$ARGUMENTS` is either an issue reference (GitHub issue, or spec filename) or a prose description. Detect by format:
+`$ARGUMENTS` is either an issue reference (GitHub issue, beads ID, or spec filename) or a prose description. Detect by format:
 
 | Input format | Source | Example |
 |--------------|--------|---------|
@@ -44,13 +44,32 @@ Use `.agent/work/<issue>/` as the folder for all working files. Do not remove it
 
 ### Initialize the working directory
 
-Create `.agent/work/<issue>/`. Do not write `ISSUE.md` yet — it is produced at the end of Step 3.
+Create `.agent/work/<issue>/`. Do not write `ISSUE.md` yet — it is produced at the end of Step 4.
 
 ---
 
-## Step 1: Interview
+## Step 1: Codebase Exploration
 
-Seed the spec with the loaded content (or prose description) using the Target Structure below as a skeleton. Then interview the user to flesh out the details.
+**Goal:** build real understanding of the relevant code *before* asking clarifying questions, so the interview can be grounded in concrete files instead of abstractions.
+
+Launch **2–3 code-explorer agents in parallel**, each targeting a different angle. Pick the angles that best fit the seed content — for example:
+
+- "Find features similar to the described task and trace through their implementation"
+- "Map the architecture and abstractions for the area this task will touch"
+- "Analyze the current implementation of the feature/module being modified"
+- "Identify UI patterns, testing approaches, or extension points relevant to this task"
+
+Each agent must return a prose summary of what it found **plus a list of 5–10 key files the orchestrator should read**.
+
+After the agents return, **the orchestrator reads every flagged file** (deduplicated) with the `Read` tool. This builds concrete context so later steps aren't reasoning over second-hand summaries.
+
+Write a short notes file at `.agent/work/<issue>/exploration.md` capturing the key patterns, relevant files, and architectural landmarks for later agents to reference.
+
+---
+
+## Step 2: Interview
+
+With the codebase context fresh in mind, interview the user to flesh out the spec. Use the Target Structure below as a skeleton.
 
 ### Target Structure for the spec
 
@@ -72,24 +91,15 @@ What should happen when this is done? Describe from the user's or caller's persp
 What is explicitly NOT part of this task. Boundaries the implementer should respect.
 
 ## Constraints
-Known technical boundaries: must integrate with X, cannot change Y,
-must remain backwards-compatible with Z, performance requirements, etc.
+Known technical boundaries: must integrate with X, cannot change Y, backwards-compatibility,
+performance requirements, etc.
 
 ## Context
 Relevant code paths, modules, prior discussion, related issues.
-Anything that helps the implementer orient quickly.
+Include the key findings from Step 1.
 
 ## Implementation notes
-(Populated in Step 3 from review findings — not during the interview.)
-
-### Software considerations
-<Idiomatic patterns, design decisions, simplification opportunities>
-
-### Architecture considerations
-<Structural impact, module boundaries, integration points>
-
-### Agent workflow recommendation
-<Suggested approach for implementation: parallelization strategy, specialist splits, high-risk areas>
+(Populated in Step 4 from review findings — not during the interview.)
 ```
 
 ### Section-by-section interview guidance
@@ -97,343 +107,214 @@ Anything that helps the implementer orient quickly.
 Work through these in roughly this order, but follow the natural conversation — don't force a rigid sequence. Always produce **Problem**, **Desired behavior**, and **Acceptance criteria** at minimum; skip other sections if they aren't relevant.
 
 1. **Problem & Desired behavior.** The seed usually covers this partially. Ask clarifying questions until you could explain the task to a stranger.
-2. **Acceptance criteria.** This is the most important section for downstream automation. Push for concrete, testable statements. Transform vague requirements ("it should be fast") into specific ones ("response time under 200ms for the p95 case"). Each criterion should be a clear pass/fail check.
-3. **Scope.** Ask: "Is there anything that might seem related but should NOT be part of this task?" This prevents scope creep during implementation.
+2. **Acceptance criteria.** The most important section for downstream automation. Push for concrete, testable statements. Transform vague requirements ("it should be fast") into specific ones ("p95 response time under 200ms").
+3. **Scope.** Ask: "Is there anything that might seem related but should NOT be part of this task?"
 4. **Constraints.** Ask about integration points, backwards compatibility, and anything the implementer must not break.
-5. **Context.** Ask about relevant files, modules, or prior art in the codebase. Even rough pointers ("somewhere in the auth module") help downstream agents orient.
+5. **Context.** Reference Step 1's findings and ask about additional files, modules, or prior art worth noting.
 
 ### Interview guidelines
 
-- Use the `AskUserQuestion` tool for every interview question. Do not use plain text for questions unless the user explicitly asks to chat about one.
-- One question at a time. Do not overwhelm the user with multiple questions per turn.
-- Keep questions focused on clarifying the problem and producing a clear spec.
-- Update the spec incrementally so the user can see progress and correct course.
-- Use plain, direct language in the spec — no filler.
-- Prefer observable outcomes in acceptance criteria ("API returns 404 when resource not found") over implementation prescriptions ("add a null check in the handler"). Let the implementer decide *how*.
-- If the user provides implementation hints or preferences, capture them in **Constraints** or **Context** — not as acceptance criteria.
+- Use `AskUserQuestion` for every interview question. Do not use plain text for questions unless the user explicitly asks to chat about one.
+- One question at a time. Do not overwhelm the user.
+- Update the spec incrementally so the user can see progress.
+- Use plain, direct language — no filler.
+- Prefer observable outcomes in acceptance criteria over implementation prescriptions. Let the implementer decide *how*.
+- If the user provides implementation hints, capture them in **Constraints** or **Context** — not as acceptance criteria.
+- Use the codebase context from Step 1 to ask sharper, concrete questions ("I saw auth middleware at `src/auth/middleware.ts` — should this reuse that, or is it separate?") rather than generic ones.
 
-**Never stop the interview without asking the user if we are finished, even if you have no more questions. Always confirm with the user before ending the interview.**
-
----
-
-## Step 2: Review Phase
-
-After the user confirms the interview is complete, launch THREE review agents in parallel. Each receives the current spec and has read access to the codebase.
-
-### 1. Software Review (Agent subagent_type="general-purpose")
-
-Provide: the spec contents + instruction to explore relevant parts of the codebase.
-
-The agent should:
-- Read the code areas referenced in the Context section (and discover adjacent code as needed)
-- Identify idiomatic patterns already in use (language conventions, error handling style, naming, module structure)
-- Flag design decisions the spec leaves open that should be resolved before implementation — e.g., "the spec says 'add validation' but doesn't specify where: handler level (consistent with existing pattern) or service level"
-- Suggest simplifications: is there existing infrastructure (helpers, base classes, middleware) the implementer should reuse?
-- Note any ambiguity in the acceptance criteria that could lead to divergent implementations
-
-Output format:
-
-```
-## Software Review
-
-### Existing patterns to follow
-<What the codebase already does that the implementer should be consistent with>
-
-### Open design decisions
-<Choices the spec doesn't resolve that will affect implementation>
-
-### Simplification opportunities
-<Existing code to reuse, unnecessary complexity to avoid>
-
-### Ambiguities
-<Anything in the spec that could be read two ways>
-```
-
-### 2. Architecture Review (Agent subagent_type="general-purpose")
-
-Provide: the spec contents + instruction to explore the broader application structure.
-
-The agent should:
-- Assess whether this change impacts module boundaries, dependencies, or the overall structure of the application
-- Identify if new interfaces, contracts, or integration points are introduced
-- Check whether the change requires updates to shared infrastructure (database schemas, API contracts, configuration, build pipeline)
-- Flag any risk of unintended coupling or architectural drift from the existing design
-
-Output format:
-
-```
-## Architecture Review
-
-### Structural impact
-<Which modules/layers are affected and how>
-
-### New boundaries or contracts
-<Any new interfaces, API changes, schema migrations, or config changes required>
-
-### Risks
-<Coupling concerns, architectural drift, or things that could go wrong at the structural level>
-
-### Prerequisites
-<Anything that must exist or be true before this work can proceed>
-```
-
-### 3. Agentic Workflow Review (Agent subagent_type="general-purpose")
-
-Provide: the spec contents + instruction to explore the codebase structure for parallelization assessment.
-
-The agent should analyze the task's structure and recommend how implementation should be approached:
-- Can the work be decomposed into independent parallel tasks, or is it inherently sequential?
-- Are there natural specialist roles (backend, frontend, database, tests) that map to separate agents?
-- Is this a good candidate for agent teams (coordination, shared discoveries) or subagents (independent work that reports back)?
-- What's the likely batch structure? How many parallel batches, roughly how many tasks per batch?
-- Are there any tasks that are high-risk and should get extra review attention?
-
-Output format:
-
-```
-## Agent Workflow Recommendation
-
-### Parallelization potential
-<High/Medium/Low — with reasoning about task independence>
-
-### Recommended approach
-<Subagents or Agent Teams — and why>
-
-### Suggested task decomposition
-<Rough sketch of how tasks could be batched, NOT a full plan>
-
-### High-risk areas
-<Tasks that warrant extra review attention or human checkpoints>
-```
+**Never stop the interview without asking the user if we are finished. Always confirm with the user before ending the interview.**
 
 ---
 
-## Step 3: Triage & Resolution
+## Step 3: Spec Clarity Review
 
-After all three reviews complete, classify each finding into one of three categories.
+After the interview is confirmed complete, dispatch a single **`plan-review`** agent:
 
-### Category A: Open decisions and ambiguities requiring user input
+- **Artifact**: the finalized spec
+- **Lens**: `spec-clarity`
+- **Mode**: `findings`
+- **Supporting context**: `.agent/work/<issue>/exploration.md`
 
-Findings where only the user can answer — a design choice, an ambiguous requirement, a trade-off with no obvious default.
+The agent returns findings pre-categorized into Category A (decisions requiring human input), Category B (useful context), and Category C (drop).
 
-Examples:
-- "The spec says 'add validation' but doesn't specify where — handler or service level?"
-- "This could be a new endpoint or an extension of the existing one. Which?"
-- "The acceptance criteria say 'returns an error' but don't specify the error format. The codebase uses both RFC 7807 and custom JSON — which should this follow?"
-
-### Category B: Useful context for the implementer
-
-Non-controversial findings that don't require a decision — just useful information. Existing patterns, reusable infrastructure, structural observations, the agent workflow recommendation.
-
-### Category C: Not actionable or irrelevant
-
-Noise. Drop it.
-
-### Resolution flow
-
-1. **Present all findings to the user**, organized by category. For Category A items, be explicit: "These need your input before the spec can be finalized."
-
-2. **If there are Category A items → enter a focused clarification pass.** This is a narrower interview — you are NOT re-interviewing the whole problem, only resolving the specific open decisions and ambiguities the reviews surfaced.
-
-   Follow the same interview guidelines as Step 1:
-   - One question at a time via `AskUserQuestion`
-   - Update the spec after each decision
-   - Show the user what changed
-
-   As decisions are made, update the appropriate section of the spec:
-   - Resolved design decisions → **Constraints** or **Acceptance criteria** (depending on whether it's a constraint on implementation or a testable outcome)
-   - Resolved ambiguities → clarify the **Acceptance criteria**
-   - New scope boundaries discovered → **Scope**
-
-3. **After all Category A items are resolved**, populate the **Implementation notes** section of the spec with Category B findings from all three reviews:
-   - Software Review's findings → `### Software considerations`
-   - Architecture Review's findings → `### Architecture considerations`
-   - Agentic Workflow Review's findings → `### Agent workflow recommendation`
-
-4. **If there are NO Category A items**, skip straight to populating Implementation notes with Category B findings.
-
-### Persist the finalized spec
-
-Write the finalized spec to `.agent/work/<issue>/ISSUE.md`. This is the source of truth for all downstream agents.
+> Architecture-level concerns and parallelization strategy are deferred to Step 6 (architecture proposals) and Step 7 (plan), where they're handled concretely rather than as abstract review findings.
 
 ---
 
-## Step 4: Checkpoint
+## Step 4: Triage & Resolution
 
-Use `AskUserQuestion` to present the finalized spec and ask the user to proceed with implementation or stop here.
+The `plan-review` agent returns findings already grouped:
 
-- **Proceed** → continue to Step 5.
+- **Category A** — Open decisions and ambiguities only the user can resolve
+- **Category B** — Useful context for the implementer (reusable infrastructure, patterns to follow)
+- **Category C** — Not actionable; drop it
+
+Briefly validate the categorization (move findings between categories if the agent miscategorized), then:
+
+1. Present findings to the user, organized by category. For Category A items, be explicit: "These need your input before the spec can be finalized."
+
+2. **If there are Category A items**, enter a focused clarification pass — a narrower interview resolving only the surfaced decisions. Same guidelines as Step 2: one `AskUserQuestion` at a time, update the spec after each decision, show the user what changed.
+
+3. After Category A items are resolved (or immediately, if none), fold Category B findings into the spec's **Context** and **Implementation notes** sections.
+
+4. Write the finalized spec to `.agent/work/<issue>/ISSUE.md`. This is the source of truth for all downstream agents.
+
+---
+
+## Step 5: Checkpoint
+
+Use `AskUserQuestion` to present the finalized spec and ask the user to proceed with architecture proposals or stop here.
+
+- **Proceed** → continue to Step 6.
 - **Stop** → halt the skill. `ISSUE.md` remains in `.agent/work/<issue>/` for later use.
 
 Do not proceed past this point without explicit confirmation.
 
 ---
 
-## Step 5: Plan
+## Step 6: Architecture Proposals
 
-### 5a. Create the implementation plan
+**Goal:** produce multiple implementation approaches with different trade-offs so the user can pick the one they want.
 
-Use the Agent tool with `subagent_type="general-purpose"` to create the plan.
+Launch **three code-architect agents in parallel**, each with a different framing:
 
-Provide the subagent with:
-- The contents of `.agent/work/<issue>/ISSUE.md`
-- Instruction to explore the codebase and understand existing patterns
+1. **Minimal changes** — smallest diff, maximum reuse of existing code, lowest risk. Deprioritizes elegance when reuse means awkward fits.
+2. **Clean architecture** — maintainability, clear abstractions, idiomatic patterns. Accepts more new code when it improves the design.
+3. **Pragmatic balance** — speed + quality. Reuses where sensible, introduces new abstractions where they clearly pay off.
 
-The plan agent must:
-- Break work into small, independent tasks (one logical unit each, roughly 2–5 minutes of implementation work per task)
-- For EACH task, specify:
-  - **Goal**: what this task accomplishes (tied to specific acceptance criteria from `ISSUE.md`)
-  - **Files to modify/create**: exact paths
-  - **Test files**: exact paths
-  - **Interface contracts**: any types, function signatures, or APIs this task produces that other tasks depend on
-  - **Dependencies**: which other tasks must complete first (by task ID)
-- Group tasks by file overlap — tasks touching the same files must be sequential
-- Make TDD explicit in each task: write the failing test first, then the implementation
-- Write the plan to `.agent/work/<issue>/plans/<feature>.md`
+Each agent receives: `ISSUE.md` + `exploration.md`. Each must return:
+- A one-paragraph summary of the approach
+- Key design decisions (what abstractions are introduced, what's reused, what's changed)
+- Concrete files affected (created / modified / deleted)
+- Trade-offs: what this approach gives up relative to the others
 
-### 5b. Review the plan
+### Orchestrator synthesis
 
-Launch TWO review agents in parallel:
+Read all three proposals. Form an opinion on which fits best given the task's size, risk profile, and urgency. Present to the user via `AskUserQuestion`:
 
-1. **Architecture review** (Agent subagent_type="general-purpose")
+- A one-line summary of each approach
+- Your recommendation, with a brief reason
+- The three proposals as options
 
-   Provide: `.agent/work/<issue>/ISSUE.md` + `.agent/work/<issue>/plans/<feature>.md`
-
-   Check:
-   - Tasks are atomic (2–5 min each)
-   - File paths are exact and realistic
-   - TDD steps are explicit
-   - No unnecessary complexity (YAGNI)
-   - Every acceptance criterion from `ISSUE.md` is covered by at least one task
-   - Interface contracts between tasks are consistent
-
-   Return `APPROVED` or `NEEDS_CHANGES` with a concrete list.
-
-2. **Security review** (Agent subagent_type="general-purpose")
-
-   Provide: `.agent/work/<issue>/ISSUE.md` + `.agent/work/<issue>/plans/<feature>.md`
-
-   Check:
-   - No hardcoded secrets planned
-   - Input validation included where needed
-   - Auth/authz considerations addressed
-   - Logging won't expose PII
-   - Error handling planned
-
-   Return `APPROVED` or `NEEDS_CHANGES` with a concrete list.
-
-### 5c. Fix loop (max 3 iterations)
-
-If either reviewer returns `NEEDS_CHANGES`: dispatch a fixer agent with the specific feedback, then re-review.
-
-Loop until BOTH return `APPROVED` — or abort after 3 fix iterations and report what's unresolved. Do not proceed to Step 6 without both approvals.
+**Wait for the user's choice.** If the user picks "Other" with "whatever you think is best", confirm your recommendation explicitly before proceeding. Save the chosen proposal to `.agent/work/<issue>/approach.md`.
 
 ---
 
-## Step 6: Implement (parallel batches)
+## Step 7: Plan
 
-Identify parallel batches from the plan. Tasks that touch different files can run in parallel.
+### 7a. Decompose the chosen approach
+
+Dispatch a **code-architect** agent with `ISSUE.md` + `approach.md` + `exploration.md`. The agent produces the task breakdown.
+
+Each task must specify:
+- **Goal** — what it accomplishes (tied to specific acceptance criteria from `ISSUE.md`)
+- **Files to modify/create** — exact paths
+- **Test files** — exact paths
+- **Interface contracts** — any types, function signatures, or APIs this task produces that others depend on
+- **Dependencies** — which tasks must complete first (by task ID)
+
+Requirements: tasks atomic (roughly 2–5 minutes of implementation work each); tasks touching the same files grouped as sequential; TDD explicit (failing test first, then implementation). Write the plan to `.agent/work/<issue>/plans/<feature>.md`.
+
+### 7b. Self-review
+
+Launch two **`plan-review`** agents in parallel. Both receive the plan as artifact and `ISSUE.md` + `exploration.md` as supporting context. Both use `mode: gate`.
+
+- Lens `architecture` — tasks atomic, file paths realistic, TDD explicit, YAGNI, every acceptance criterion covered, interface contracts consistent.
+- Lens `security` — no hardcoded secrets, input validation where needed, auth/authz addressed, logging won't expose PII, error handling planned.
+
+Each returns `APPROVED` or `NEEDS_CHANGES` with a concrete action list.
+
+### 7c. Fix loop (max 3 iterations)
+
+If either returns `NEEDS_CHANGES`: dispatch a fixer agent with the specific feedback, then re-review. Loop until both approve — or abort after 3 iterations and report what's unresolved. Do not proceed to Step 8 without both approvals.
+
+---
+
+## Step 8: Implement
+
+Identify parallel batches from the plan. Tasks that touch different files run in parallel.
 
 ### Dispatch rules
 
-For each batch of independent tasks, dispatch ALL implementers in parallel using the Agent tool.
+For each batch, dispatch all implementers in parallel. **Each implementer receives a scoped context — NOT the full plan.** Construct each prompt with exactly:
 
-**Each implementer receives a scoped context — NOT the full plan.** Construct the prompt for each implementer with exactly:
-
-1. **Overall goal** (one paragraph from `ISSUE.md` — the Problem and Desired behavior sections only)
-2. **This task's specification** (copied from the plan: goal, files, test files)
-3. **Interface contracts this task must respect** (types, signatures, APIs produced by already-completed tasks that this task depends on)
-4. **Relevant code from already-completed tasks** (only if this task has dependencies — provide the specific files and the changes made, not the full history)
+1. **Overall goal** — one paragraph from `ISSUE.md` (Problem + Desired behavior only)
+2. **This task's specification** — goal, files, test files from the plan
+3. **Interface contracts this task must respect** — from already-completed tasks it depends on
+4. **Relevant code from already-completed tasks** — only if this task depends on them; specific files and changes, not full history
 
 Do NOT include: the full plan, other tasks' specifications, review feedback from other tasks, or the full issue description.
 
-### After each batch
+Each implementer returns the list of files it created or modified and a short summary of changes. The orchestrator aggregates these into a running manifest at `.agent/work/<issue>/changed_files.md` so downstream agents can be given exact targets without running `git`.
 
-Dispatch parallel code reviews for each completed task. Each reviewer receives the task specification + the files the implementer modified (paths and current contents) + the implementer's summary of what was changed. Not the full plan.
+### Per-task review (after each batch)
 
-Each implementer is required to return, as part of its output, the list of files it created or modified and a short summary of the changes. The orchestrator aggregates these into a running manifest at `.agent/work/<issue>/changed_files.md` so downstream review agents can be given exact targets without running `git`.
+For each completed task, dispatch **three code-reviewer agents in parallel**, each with a different focus:
 
-### If NEEDS_CHANGES (max 3 iterations per task)
+- **Simplicity / DRY / elegance** — is this the simplest implementation that works? Any duplication worth consolidating? Could it be more readable?
+- **Bugs / correctness** — logical errors, missed edge cases, off-by-ones, incorrect assumptions, test adequacy.
+- **Conventions** — consistency with patterns identified in Step 1, naming, error handling style, module structure.
 
-Dispatch a fix agent for the specific task with the review feedback, then re-review only the fixed task.
+Each reviewer receives: the task specification + the files the implementer modified (paths and current contents) + the implementer's change summary. Not the full plan.
 
-If a task fails 3 fix iterations, pause and report the situation. Do not continue to the next batch if a dependency has failed.
+Each returns `APPROVED` or `NEEDS_CHANGES` with specifics. A task is approved only when all three approve.
 
-### Proceed to the next batch when the current batch is fully approved.
+### Fix loop (max 3 iterations per task)
+
+If any reviewer returns `NEEDS_CHANGES`, dispatch a fix agent with the consolidated feedback, then re-review only that task. After 3 failed fix iterations, pause and report. Do not continue to the next batch if a dependency has failed.
 
 ---
 
-## Step 7: Verify
+## Step 9: Verify
 
-Dispatch a **verification agent** (Agent subagent_type="general-purpose") with a clean context.
+Dispatch a **verification agent** (`general-purpose`) with a clean context.
 
-Provide the agent with:
+Provide:
 - The commands to run (build, test, lint — whatever the project uses)
-- Instruction to run the commands and report raw results: exact pass/fail counts, exit codes, and any error output
+- Instruction to run them and report raw results: exact pass/fail counts, exit codes, and error output
 
-The verification agent does NOT interpret or judge — it gathers evidence and reports.
+The agent does NOT interpret or judge — it gathers evidence and reports.
 
-**You (the orchestrator) then read the results and decide:**
-- All tests pass and build succeeds → proceed to Step 8
+**You decide:**
+- All tests pass and build succeeds → proceed to Step 10
 - Any failures → dispatch a fixer agent with the failure output, then re-verify (max 3 attempts)
 - After 3 failed verification cycles → stop and report
 
 ---
 
-## Step 8: Review & Summarize
+## Step 10: Review & Summarize
 
-### 8a. Parallel review agents
+### 10a. Parallel review
 
-Launch TWO review agents in parallel:
+Launch two **`plan-review`** agents in parallel, both with `mode: gate`. Each receives the files listed in `.agent/work/<issue>/changed_files.md` (paths and current contents) as artifact, plus `ISSUE.md` + `.agent/work/<issue>/plans/<feature>.md` as supporting context.
 
-1. **Spec Compliance Agent** (Agent subagent_type="general-purpose")
+- Lens `acceptance-criteria` — which criteria were delivered, partially delivered, skipped, or added beyond scope; decisions and trade-offs made during implementation; deviations from the plan.
+- Lens `architecture` — pattern consistency with the existing codebase, new duplication or consolidation opportunities, coupling and cohesion, suggested follow-ups.
 
-   Provide: `.agent/work/<issue>/ISSUE.md` + `.agent/work/<issue>/changed_files.md` + the current contents of every file listed in the manifest
+### 10b. Fix loop (max 3 iterations)
 
-   Report:
-   - **Delivered** — acceptance criteria fully met (reference specific criteria from `ISSUE.md`)
-   - **Partially delivered** — criteria met with caveats
-   - **Skipped** — criteria not addressed (with reason)
-   - **Added beyond scope** — work done that wasn't in the original spec
-   - **Decisions & trade-offs** — non-obvious choices made during implementation
-   - **Deviations from plan** — where implementation diverged from `.agent/work/<issue>/plans/` and why
+If either reviewer returns `NEEDS_CHANGES`, dispatch a fixer agent with the consolidated feedback, re-run Step 9 (Verify), then re-run Step 10a on the updated files. Loop until both approve — or after 3 iterations, proceed to the summary with the outstanding issues documented under "Known issues" in `SUMMARY.md`.
 
-2. **Architecture Analysis Agent** (Agent subagent_type="general-purpose")
+### 10c. SUMMARY.md
 
-   Provide: the files listed in `.agent/work/<issue>/changed_files.md` + their surrounding module structure
-
-   Report:
-   - **Pattern consistency** — does the new code follow existing conventions?
-   - **Duplication** — any new duplication introduced, or opportunities to consolidate?
-   - **Coupling & cohesion** — are dependencies reasonable? Any tight coupling?
-   - **Suggested follow-ups** — structural improvements worth considering (not blockers)
-
-### 8b. Synthesize into SUMMARY.md
-
-Dispatch a **Summary Writer Agent** (Agent subagent_type="general-purpose") with the output from both review agents. It must produce `.agent/work/<issue>/SUMMARY.md`:
+Dispatch a **Summary Writer Agent** (`general-purpose`) with both review outputs (including any unresolved `NEEDS_CHANGES` items from Step 10b). It produces `.agent/work/<issue>/SUMMARY.md`:
 
 ```markdown
 # Summary
 
 ## What was done
-<Concise description of the delivered work>
+<Concise description>
 
 ## Acceptance criteria status
 - [x] Criterion from spec — met
-- [x] Criterion from spec — met
-- [ ] Criterion from spec — not met (reason)
+- [ ] Criterion — not met (reason)
 
 ## Decisions & trade-offs
-<Non-obvious choices and their rationale>
-
 ## Deviations from plan
-<Where and why implementation diverged from the original plan>
-
 ## Architectural notes
-<How the new code fits with the existing codebase, pattern consistency, and any concerns>
-
+## Known issues
+<Unresolved NEEDS_CHANGES items from Step 10b, if any>
 ## Suggested follow-ups
-<Refactoring, structural improvements, or future work worth considering>
 ```
 
 `SUMMARY.md` is the final artifact of this skill. The user reads it and decides what to do next (commit, push, open a PR, or discard) — /opus does none of those things.
@@ -444,17 +325,24 @@ Dispatch a **Summary Writer Agent** (Agent subagent_type="general-purpose") with
 
 1. **Orchestrator doesn't code** — after the interview, you dispatch, read results, and make decisions. You don't write implementation code yourself.
 2. **Fresh subagent per logical unit** — clean context, no pollution.
-3. **Scoped context per implementer** — each agent gets only what it needs: its task, the overall goal, and relevant interface contracts. Never the full plan.
-4. **Maximize parallelization** — non-overlapping files = parallel dispatch.
-5. **Review loops until approved** — never skip `NEEDS_CHANGES` feedback.
-6. **Iteration limits everywhere** — max 3 fix iterations per task, per review, per verification. Fail loudly, don't grind.
-7. **TDD is mandatory** — every implementer must demonstrate test-first.
-8. **Verify in a clean context** — dispatch a fresh agent to gather evidence, then decide yourself.
-9. **Summarize before stopping** — always produce `SUMMARY.md` as the final record of what was built.
-10. **Interview questions go through `AskUserQuestion`** — not plain text.
-11. **Always confirm before ending the interview.**
-12. **Never bypass the Step 4 checkpoint** — the user must explicitly approve the spec before implementation begins.
-13. **No version control — ever.** Neither the orchestrator nor any subagent runs `git` (any subcommand — no `diff`, `log`, `status`, `commit`, `push`, `branch`, `tag`, `stash`, nothing), invokes `gh` for anything that changes state (no `pr create`, no `issue edit`, no label or status changes), or otherwise touches the repository's version-control state. Read-only metadata fetches via `gh issue view` in Step 0 for loading seed content are the sole exception. Understanding what changed is done via the `.agent/work/<issue>/changed_files.md` manifest, not `git diff`. The user performs all version control themselves.
+3. **Scoped context per implementer** — each agent gets only what it needs: its task, the overall goal, relevant interface contracts. Never the full plan.
+4. **Read what agents flag** — when exploration or review agents return a list of files, read them with the `Read` tool to build real context, not just scan their summaries.
+5. **Maximize parallelization** — non-overlapping files = parallel dispatch.
+6. **Review loops until approved** — never skip `NEEDS_CHANGES` feedback.
+7. **Iteration limits everywhere** — max 3 fix iterations per task, per review, per verification. Fail loudly, don't grind.
+8. **TDD is mandatory** — every implementer must demonstrate test-first.
+9. **Verify in a clean context** — dispatch a fresh agent to gather evidence, then decide yourself.
+10. **Summarize before stopping** — always produce `SUMMARY.md` as the final record.
+11. **Interview questions go through `AskUserQuestion`** — not plain text.
+12. **Always confirm before ending the interview.**
+13. **Never bypass user checkpoints** — Step 5 (spec approval) and Step 6 (architecture choice) both require explicit user input.
+14. **Use specialized agents where they fit:**
+    - `code-explorer` — codebase surveys in Step 1.
+    - `code-architect` — architecture proposals (Step 6) and plan decomposition (Step 7a).
+    - `plan-review` — artifact-level reviews (Steps 3, 7b, 10a), invoked with the appropriate `lens` and `mode` (`findings` for triage, `gate` for approval).
+    - `code-reviewer` — per-task post-implementation review (Step 8), three parallel dispatches with different focuses.
+    - `general-purpose` — implementers, fixers, the verification agent, and the summary writer.
+15. **No version control — ever.** Neither the orchestrator nor any subagent runs `git` (any subcommand — no `diff`, `log`, `status`, `commit`, `push`, `branch`, `tag`, `stash`), invokes `gh` for anything that changes state (no `pr create`, no `issue edit`, no label or status changes), or otherwise touches the repository's version-control state. Read-only `gh issue view` in Step 0 for loading seed content is the sole exception. Understanding what changed is done via the `.agent/work/<issue>/changed_files.md` manifest, not `git diff`. The user performs all version control themselves.
 
 ---
 
