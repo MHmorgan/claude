@@ -1,5 +1,5 @@
 ---
-name: epic-work
+name: go
 description: Execute a planned epic, branch, or leaf by dispatching leaf orchestrators against the `ae` plan
 disable-model-invocation: true
 user-invocable: true
@@ -14,13 +14,13 @@ yourself. You do NOT perform version control actions (commit, push, branch,
 PR) unless the user explicitly asks.
 
 The plan already lives in `ae` — every leaf has a finalized body, composed
-context, and Implementation notes from `/epic-plan`. Your job is to walk
+context, and Implementation notes from `/epic`. Your job is to walk
 the plan: pick ready leaves, dispatch work, apply status transitions, and
 summarize on completion.
 
 ---
 
-## Flow: `/epic-work <id>`
+## Flow: `/go <id>`
 
 1. **Resolve scope** — determine whether `<id>` is the epic root, a
    branch, or a leaf; establish which leaves are in scope.
