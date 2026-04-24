@@ -61,34 +61,41 @@ in Step 1c.
 
 ## Step 1: Execute leaves (multi-leaf scope)
 
-### 1a. Pick the next leaf
+### 1a. Collect the next batch of ready leaves
 
 ```
 ae task:next <epic>
 ```
 
 This returns the first `pending` leaf whose sibling dependencies are
-satisfied. Filter the result to your scope:
+satisfied. Filter to your scope:
 - Epic scope: any leaf in the epic qualifies.
 - Branch scope: only leaves whose id starts with `<branch>:`.
 
-If `task:next` returns empty, or every ready leaf is out of scope — all
-in-scope work is terminal. Go to Step 2.
+**Assemble a parallel batch.** Start the returned leaf with
+`ae task:start <leaf>` so it becomes `active`, then call `ae task:next`
+again. If it returns another in-scope leaf, start that too, and repeat.
+Stop when `task:next` returns empty, a leaf outside your scope, or you
+hit a reasonable batch cap (e.g. 4 parallel leaves).
 
-### 1b. Dispatch a leaf orchestrator
+**File-conflict assumption.** `task:next` uses sibling `:after` edges,
+not file analysis. Parallel dispatch is safe only if the planner encoded
+file conflicts as `:after` deps during `/epic`. If a batch member's
+body (`ae show <leaf>`) reveals it touches files another batch member is
+also modifying, don't dispatch them together — stop the batch at the
+last non-conflicting member, leave the rest pending for the next round.
 
-Transition the leaf to `active`:
+If the initial `task:next` returns empty, or every ready leaf is out of
+scope — all in-scope work is terminal. Go to Step 2.
 
-```
-ae task:start <leaf>
-```
+### 1b. Dispatch leaf orchestrators in parallel
 
 Read `leaf-orchestrator.md` (adjacent to this SKILL.md) once per session
 — you'll reuse its content across dispatches.
 
-Dispatch a fresh `general-purpose` subagent with a prompt containing:
-- The full content of `leaf-orchestrator.md` (so the subagent has its
-  operating instructions).
+In a **single message**, dispatch one fresh `general-purpose` subagent
+per leaf in the batch. Each prompt contains:
+- The full content of `leaf-orchestrator.md` (operating instructions).
 - The leaf id to work on.
 - The required return format:
   ```
@@ -99,21 +106,32 @@ Dispatch a fresh `general-purpose` subagent with a prompt containing:
   }
   ```
 
-Wait for the subagent to return. The subagent handles its own planning,
-implementation, verification, reviews, records, and handoff context.
+Wait for all subagents in the batch to return. Each handles its own
+planning, implementation, verification, reviews, records, and handoff
+context.
 
-### 1c. Apply the result
+### 1c. Apply results
 
-Based on the returned `status`:
+For each returned result, apply status:
 
-- **done** → `ae task:done <leaf>` → back to 1a.
-- **blocked** → `ae task:block <leaf> <reason>` → **STOP.** Go to Step 3.
-  Do not continue to the next leaf. The user decides whether to resume.
-- **abandoned** → `ae task:abandon <leaf> <reason>` → back to 1a.
-  Abandonment is a deliberate decision to stop this task; siblings can
-  still run.
+- **done** → `ae task:done <leaf>`.
+- **blocked** → `ae task:block <leaf> <reason>`.
+- **abandoned** → `ae task:abandon <leaf> <reason>`.
+
+Then decide how to proceed:
+
+- **No blocks in the batch** → back to 1a for the next batch.
+- **Any block in the batch** → **STOP.** Wait for the remaining
+  siblings in this batch to finish (they're already running), apply
+  their results, then go to Step 3. Do not assemble another batch. The
+  user decides whether to resume.
 
 Blocks halt the whole run. Abandons do not.
+
+### Single-leaf batches
+
+When only one ready leaf exists, 1a returns a batch of one and 1b
+dispatches a single orchestrator. No special-case logic needed.
 
 ---
 
@@ -137,7 +155,7 @@ Compose the summary (markdown, moderate length) covering:
 Write it:
 
 ```
-printf '%s' "$summary" | ae attr:set <epic> summary
+echo "$summary" | ae attr:set <epic> summary
 ```
 
 ### Branch scope → branch context rollup
@@ -145,7 +163,7 @@ printf '%s' "$summary" | ae attr:set <epic> summary
 Update the branch's context with a delta-focused rollup:
 
 ```
-printf '%s' "$markdown" | ae task:set-context <branch>
+echo "$markdown" | ae task:set-context <branch>
 ```
 
 Short. The branch context still has to compose with downstream planning,
@@ -189,8 +207,12 @@ they'll ask separately.
 4. **Records and handoff context are written by the leaf orchestrator** —
    you don't touch them.
 5. **Blocks stop everything.** Report to the user and wait.
-6. **Sequential leaves.** One at a time via `ae task:next`. No parallel
-   leaf orchestrators in v1.
+6. **Parallel leaves when deps allow.** Assemble a batch via repeated
+   `ae task:next` + `ae task:start`, then dispatch all leaf orchestrators
+   in a single message. The planner is responsible for encoding
+   file-level conflicts as sibling `:after` deps during `/epic`; if the
+   plan didn't capture them, parallel runs may collide — stop the batch
+   before conflicting members.
 7. **Single-leaf scope is inline** — skip the dispatch layer.
 
 ---

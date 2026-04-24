@@ -26,11 +26,46 @@ body and a handoff context.
 1. **Resolve the epic** — `ae epics` first. If the description matches an
    existing in-progress epic, offer to resume it. Otherwise create a slug
    (lowercase, `[a-z][a-z0-9-]*`), then `ae task:new-epic <slug>`.
-2. **Plan the root task** via the per-task loop below.
-3. **Recurse depth-first** into any children created by splits — finish
+2. **Explore the codebase** once for the whole epic — see *Codebase
+   exploration* below. Seeds every downstream interview with concrete file
+   references instead of abstractions. Skip only when resuming an
+   in-progress epic whose root context already contains exploration notes.
+3. **Plan the root task** via the per-task loop below.
+4. **Recurse depth-first** into any children created by splits — finish
    child `:1` and its entire subtree before starting `:2`.
-4. **Review each branch** once all its descendants are planned.
-5. **Confirm completion** when the whole tree is planned.
+5. **Review each branch** once all its descendants are planned.
+6. **Confirm completion** when the whole tree is planned.
+
+---
+
+## Codebase exploration
+
+Run this once per epic, before planning the root task. The distilled
+output propagates down through ancestor context composition, so every
+later per-task loop starts with concrete file references.
+
+1. Launch **2–3 `code-explorer` agents in parallel**, each targeting a
+   different angle. Pick angles that best fit the epic's seed — for
+   example:
+   - "Find features similar to <epic> and trace through their
+     implementation"
+   - "Map the architecture and abstractions for the area this epic will
+     touch"
+   - "Analyze the current implementation of the feature/module being
+     modified"
+   - "Identify UI patterns, testing approaches, or extension points
+     relevant to <epic>"
+
+   Each agent returns a prose summary plus **5–10 key files** to read.
+
+2. **Read every flagged file** (deduplicated) with the `Read` tool. This
+   builds real context — don't reason from second-hand summaries.
+
+3. **Distil into the epic context** (≤ 15 lines): key patterns, relevant
+   files/modules, architectural landmarks, extension points. Write with
+   `echo "$notes" | ae task:set-context <epic>`. Longer raw
+   findings can be appended as records via `ae task:record <epic>` for
+   traceability.
 
 ---
 
@@ -43,7 +78,7 @@ Run this on every task, starting with the root.
    (`ae context <parent>`) for children — write a minimal
    seed: a title, one paragraph capturing the task's intent, and if the
    shape is obvious, a provisional outline of the work. Keep it brief;
-   this is scaffolding, not the plan. `printf '%s' "$seed" | ae task:set-body <id>`.
+   this is scaffolding, not the plan. `echo "$seed" | ae task:set-body <id>`.
 2. **Scope: branch or leaf?** Ask the user explicitly, surfacing your
    read as the recommended option:
    - **Leaf** — one chunk of work, a single implementation session could
@@ -57,7 +92,7 @@ Run this on every task, starting with the root.
    starts looking obviously right — re-scope, restructure the body,
    continue.
 3. **Restructure to the chosen template** and write it:
-   `printf '%s' "$body" | ae task:set-body <id>`. Slot the seed content into the
+   `echo "$body" | ae task:set-body <id>`. Slot the seed content into the
    appropriate sections. See *Target body — leaf task* or *Target body —
    branch task (pre-split)* below.
 4. **Interview into the template.** Refine the body through questions
@@ -76,7 +111,7 @@ Run this on every task, starting with the root.
      are ordered. Record with `ae task:after <child> <pred>`. Deps
      stay editable anytime with `task:after` / `task:unafter` —
      re-prompt only if structure materially changes.
-   - **Branch context:** `printf '%s' "$context" | ae task:set-context <id>` with shared info
+   - **Branch context:** `echo "$context" | ae task:set-context <id>` with shared info
      children will need (cross-cutting decisions, terminology,
      references). Keep it ≤ 15 lines.
    - Recurse into child `:1`, finish its entire subtree, then `:2`, etc.
@@ -86,8 +121,8 @@ Run this on every task, starting with the root.
    - **Triage** findings; resolve Category A via a focused follow-up
      interview.
    - Populate **Implementation notes** with Category B findings.
-   - Write the finalized body: `printf '%s' "$body" | ae task:set-body <id>`.
-   - Write the handoff context: `printf '%s' "$context" | ae task:set-context <id>`. Keep it ≤
+   - Write the finalized body: `echo "$body" | ae task:set-body <id>`.
+   - Write the handoff context: `echo "$context" | ae task:set-context <id>`. Keep it ≤
      15 lines — what the implementer needs that isn't obvious from
      body or ancestor contexts.
 
@@ -178,10 +213,12 @@ own planning loop.>
 <Child 2 seed content.>
 ```
 
-Populated directly during the branch interview — each `---`-separated
-section names one sub-task. The branch body is frozen after split, so
-each section should name its seam clearly and give the child's interview
-a meaningful starting draft.
+The first section (before the first `---`) is the **branch description**
+— it is NOT split into a child task. Children are created from section 2
+onward. Populated directly during the branch interview — each
+`---`-separated section after the first names one sub-task. The branch
+body is frozen after split, so each section should name its seam clearly
+and give the child's interview a meaningful starting draft.
 
 ---
 
@@ -205,32 +242,37 @@ They stack, so keep each context ≤ 15 lines.
 
 After the user confirms the leaf interview is complete, launch THREE review
 agents in parallel. Each receives:
-- The body (`ae show <id>`)
-- The composed context (`ae context <id>`)
+- The body (`ae show <id>`) as artifact
+- The composed context (`ae context <id>`) as supporting context
 - Read access to the codebase
 
-### 1. Software Review (general-purpose subagent)
+### 1. Spec clarity review (`plan-review` subagent)
 
-Flag:
-- Existing patterns the implementer should be consistent with.
-- Design decisions the body leaves open.
-- Reusable infrastructure (helpers, middleware, base classes) the
-  implementer might miss.
-- Ambiguity in acceptance criteria that could produce divergent
-  implementations.
+- **Artifact:** the leaf body
+- **Lens:** `spec-clarity`
+- **Mode:** `findings`
 
-### 2. Architecture Review (general-purpose subagent)
+Surfaces ambiguity in acceptance criteria, underspecified edge cases,
+existing patterns the implementer should follow, and reusable
+infrastructure (helpers, middleware, base classes) the spec doesn't
+mention. Findings return pre-categorized as A / B / C.
 
-Flag:
-- Which modules/layers are affected and how.
-- New interfaces, contracts, schema migrations, or config changes.
-- Coupling risks and architectural drift.
-- Prerequisites that must exist before this work can proceed.
+### 2. Architecture review (`plan-review` subagent)
 
-### 3. Agent Workflow Review (general-purpose subagent)
+- **Artifact:** the leaf body
+- **Lens:** `architecture`
+- **Mode:** `findings`
 
-Advice for the orchestrator of this leaf (the agent `/go` will
-spawn when it picks this task):
+Surfaces structural impact: which modules/layers are affected, new
+interfaces or contracts, coupling risks, architectural drift,
+prerequisites that must exist before this work can proceed. Findings
+return pre-categorized as A / B / C.
+
+### 3. Agent Workflow Review (`general-purpose` subagent)
+
+No `plan-review` lens fits this — it produces orchestrator advice, not
+spec feedback. Advice for the leaf orchestrator `/go` will spawn when it
+picks this task:
 - Parallelization potential (high/medium/low with reasoning).
 - Subagents vs agent teams, and why.
 - Rough decomposition sketch — not a full plan, the orchestrator decides.
@@ -240,29 +282,32 @@ spawn when it picks this task):
 
 ## Branch review (lightweight)
 
-Once every descendant leaf of a branch has been planned, run ONE
-general-purpose subagent with:
-- The branch body (frozen, pre-split snapshot)
-- The branch context
-- The body of each immediate child (`ae show <child>`)
+Once every descendant leaf of a branch has been planned, run a single
+`plan-review` agent:
 
-The agent answers:
+- **Artifact:** the branch body (frozen, pre-split snapshot) + the body
+  of each immediate child (`ae show <child>`) concatenated
+- **Lens:** `architecture`
+- **Mode:** `gate`
+- **Supporting context:** the branch context
+
+The agent returns `APPROVED` or `NEEDS_CHANGES` with a concrete action
+list. Typical findings:
 - Does the split still make sense given what the children turned into?
 - Are any obvious pieces missing? → `ae task:add-child <branch>` and plan
   the new child.
 - Are sibling dependencies correct, complete, and cycle-free?
 - Does the branch context adequately support the children, or should it
-  be extended? → `printf '%s' "$context" | ae task:set-context`.
-
-If the review surfaces a structural problem that can't be repaired by
-adding a child or editing deps/context, `ae task:unsplit` + re-plan may
-be necessary. Rare. Confirm explicitly with the user before suggesting.
+  be extended? → `echo "$context" | ae task:set-context`.
 
 ---
 
 ## Triage & Resolution (leaf reviews)
 
-Classify each finding from the three reviews:
+Both `plan-review` agents (spec-clarity and architecture) return findings
+already grouped as Category A / B / C. The Agent Workflow agent returns
+free-form advice — fold it into Category B as **Implementation notes →
+Agent workflow recommendation**.
 
 - **A. Open decisions & ambiguities** — user input required. Design
   choices, ambiguous requirements, trade-offs with no obvious default.
@@ -270,18 +315,28 @@ Classify each finding from the three reviews:
   information. Goes into **Implementation notes** in the body.
 - **C. Noise** — drop.
 
-Flow:
+Briefly validate the categorization (move findings between categories if
+the agent miscategorized), then:
+
 1. Present findings to the user, organized by category. Be explicit that
    Category A items need their input.
 2. If Category A items exist → focused follow-up interview (one question
    at a time via `AskUserQuestion`, rewrite body after each answer).
    Resolutions update **Constraints**, **Acceptance criteria**, or
    **Scope** as appropriate.
-3. After Category A is resolved (or if none existed), populate
+3. **Architectural Category A escape hatch.** If a Category A item is a
+   genuine architectural choice with no obvious default — two plausible
+   approaches with different trade-offs — optionally dispatch **2–3
+   `code-architect` agents in parallel** (framings: minimal changes /
+   clean architecture / pragmatic balance), present the options via
+   `AskUserQuestion`, and encode the chosen direction into
+   **Implementation notes → Architecture considerations**. Skip when the
+   choice is small-scale or a clear default exists.
+4. After Category A is resolved (or if none existed), populate
    **Implementation notes** with Category B findings from all three
    reviews.
-4. Write the finalized body: `printf '%s' "$body" | ae task:set-body <id>`.
-5. Show the final body and confirm before writing the handoff context.
+5. Write the finalized body: `echo "$body" | ae task:set-body <id>`.
+6. Show the final body and confirm before writing the handoff context.
 
 ---
 
@@ -291,16 +346,15 @@ Flow:
 ae epics                                 # list epics (resume check)
 ae task:new-epic <slug>                  # create a new epic
 ae show <id>                             # read body (plain text)
-printf '%s' "$body" | ae task:set-body <id>  # write body (stdin, leaf only)
+echo "$body" | ae task:set-body <id>  # write body (stdin, leaf only)
 ae context <id>                          # read composed context (plain text)
-printf '%s' "$ctx" | ae task:set-context <id>  # write context (stdin, any task)
+echo "$ctx" | ae task:set-context <id>  # write context (stdin, any task)
 ae task:list parent=<id>                 # list immediate children
 ae task:split <id>                       # split leaf on `---`
-ae task:unsplit <id>                     # undo split (rare)
 ae task:add-child <parent>               # add a child to a branch
 ae task:after <id> <pred>                # sibling dependency edge
 ae task:unafter <id> <pred>              # remove dependency edge
-printf '%s' "$text" | ae task:record <id>    # append an agent note (stdin)
+echo "$text" | ae task:record <id>    # append an agent note (stdin)
 ae help                                  # tool help
 ```
 
